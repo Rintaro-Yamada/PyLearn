@@ -16,13 +16,11 @@ class RBFKernel():
         self.length_scale = length_scale
 
     def __call__(self, X1: NDArray[float], X2: NDArray[float]) -> NDArray[float]:
-        temp1= np
-'''
-def RBF(input: NDArray[float]) -> NDArray[float]:
-    
-
-def Kernel(input_dim: int, variance: float, lengthscale: float) -> NDArray[float]:
-'''
+        temp1= np.c_[np.sum(X1**2,axis=1)]
+        temp2 = np.c_[np.sum(X2**2, axis=1)]
+        #この上の式よくわからん　temp1=np.dot(X1.T,X1)ではいけないの？
+        norm = temp1 + temp2.T - 2*np.dot(X1,X2.T)
+        return self.variance * np.exp(-norm/self.length_scale)
 
 def experiment(seed: int, initial_num: int, max_iter: int):
     # 定義域は[0, 1] でgrid_num分割して候補点を生成
@@ -32,13 +30,30 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     y = func(X)
     
     random.seed(seed)
-    #初期展の生成
-    train_index = random.samole(index_list, initial_num)
+    #初期点の生成
+    train_index = random.sample(index_list, initial_num)
     X_train = X[train_index]
     y_train = y[train_index]
 
     #カーネル行列の作成
-    kernel=Kernel(input_dim=X.shape[1], variance=1,lengthscale=1.0)
+    kernel=RBFKernel(variance=1,length_scale=1.0)
+    K=kernel(X_train,X_train)
+
+    #観測誤差の分散は適当に固定
+    noise_var = 1.0e-4 
+
+    # 精度(precision)行列の計算
+    precision = np.linalg.inv(K + noise_var*np.eye(np.size(X_train)))
+
+    #テストデータの作成
+    random.seed(seed+1)
+    train_index = random.sample(index_list, 5)
+    X_test = X[train_index]
+    
+    k_test_train=kernel(xtest,xtrain)
+    kK_=
+
+
 
 def main():
     argv = sys.argv
