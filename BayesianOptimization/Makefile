@@ -1,2 +1,2 @@
 bo:
-	python bayesian_optimization.py 2 5
+	python bo.py 10 5
