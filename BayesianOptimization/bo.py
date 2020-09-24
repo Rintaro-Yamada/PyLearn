@@ -21,10 +21,20 @@ class RBFKernel():
         norm = temp1 + temp2.T - 2*np.dot(X1,X2.T)
         return self.variance * np.exp(-norm / (2*self.length_scale**2))
 
-def RFM(x:NDArray[float],dim:int) -> NDArray[float]:
+def RFM(x:NDArray[float],dim:int,omega:NDArray[float],b:NDArray[float]) -> NDArray[float]:
+    phi=np.sqrt(2/dim)*(np.cos(np.dot(omega,x.T))+b)
+    return phi
 
-    phi=math.sqrt(2/dim)*math.cos(np.dot(omega,x)+c)
-
+def Theta(phi: NDArray[float], y: NDArray[float]) -> NDArray[float]:
+    noise_var = 1.0e-4
+    phi_T_phi = np.dot(phi, phi.T)
+    A = phi_T_phi + noise_var * np.eye(phi_T_phi.shape[0])
+    Ainv=np.linalg.inv(A)
+    Ainv_phi_T = np.dot(Ainv, phi)
+    mu = np.dot(Ainv_phi_T, y)
+    var = noise_var * Ainv
+    theta = np.random.multivariate_normal(mu.ravel(), var, y.shape[0])
+    return theta
 
 def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[float],X_train:NDArray[float],y_train:NDArray[float]):
     plt.rcParams["font.size"] = 13
@@ -71,11 +81,31 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     #初期データの結果のプロット
     plot(pred_mu, pred_var_diag, X, y, X_train, y_train)
 
-    #RFMからy*をサンプリング
+    dim=100
+    omega = np.c_[np.random.randn(dim)]  #標準正規分布の乱数
+    b = np.c_[np.random.rand(dim) * 2 * np.pi] #[0,2π]の一様乱数
 
+    #RFMから特徴量ベクトルφ(x)を取得
+    phi_x = RFM(X_train, dim,omega,b)  #D=100とした。
+
+    #パラメータΘの獲得
+    theta = Theta(phi_x, y_train)
+
+    #ブラックボックス関数fの近似を取得する。
+    phi = RFM(X, dim, omega, b)
+    f_x = np.dot(theta, phi)
+
+    #fのプロット
     
+    for i in range(10):
+        plt.plot(X, f_x[i], "b", label="true")
+    plt.savefig("RFM's_GP.pdf")
+    plt.close()
 
-
+    #y*の獲得
+    y_star = f_x.max(axis=1)
+    print(y_star)
+    
 def main():
     argv = sys.argv
     seed = 0
@@ -94,6 +124,8 @@ if __name__ == "__main__":
 3. カーネル何使おうか？決める(今回はRBF)
 4. カーネル行列の作成
 5. RFMの作成
+6. 関数fの近似
+7. y*の獲得
 5. 活性化関数の作成(MES)
 5. 新しい入力点x'の出力y'を求める
 
