@@ -62,7 +62,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     y_train = y[train_index]
 
     #カーネル行列の作成
-    kernel=RBFKernel(variance=5,length_scale=0.2)
+    kernel=RBFKernel(variance=5,length_scale=0.1)
     K = kernel(X_train, X_train)
 
     #観測誤差の固定
@@ -81,7 +81,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     #初期データの結果のプロット
     plot(pred_mu, pred_var_diag, X, y, X_train, y_train)
 
-    dim=100
+    dim=1000
     omega = np.c_[np.random.randn(dim)]  #標準正規分布の乱数
     b = np.c_[np.random.rand(dim) * 2 * np.pi] #[0,2π]の一様乱数
 
@@ -94,13 +94,21 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     #ブラックボックス関数fの近似を取得する。
     phi = RFM(X, dim, omega, b)
     f_x = np.dot(theta, phi)
+    print(np.shape(theta))
+
+    #RBFSamplerを使ってみる
+    #rbf_feature = RBFSampler(gamma=1, random_state=1)
+    #x_train_features = rbf_feature.fit_transform(x_train)
+    #X_features = rbf_feature.fit_transform(X)
 
     #fのプロット
-    
     for i in range(10):
         plt.plot(X, f_x[i], "b", label="true")
-    plt.savefig("RFM's_GP.pdf")
+    plt.savefig("RFM.pdf")
     plt.close()
+
+    #予測分布
+
 
     #y*の獲得
     y_star = f_x.max(axis=1)
