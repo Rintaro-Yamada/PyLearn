@@ -14,12 +14,9 @@ class ThetaGenerator():
     def calc(self, phi: NDArray[float], y: NDArray[float]) -> NDArray[float]:
         A = np.dot(phi.T, phi) + self.noise_var * np.eye(self.dim)
         Ainv=np.linalg.inv(A)
-        print(Ainv)
         Ainv_phi_T = np.dot(Ainv, phi.T)
         self.mu = np.dot(Ainv_phi_T, y)
-        self.var = self.noise_var * Ainv
-        #print(self.var)
-        print("おわrち")
+        self.var = self.noise_var * Ainv        
 
     def getTheta(self, num:int) -> NDArray[float]:
         theta = multivariate_normal.rvs(mean=self.mu.ravel(), cov=self.var, size=num) #num個関数出してみる
