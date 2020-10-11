@@ -33,7 +33,7 @@ def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[floa
     plt.savefig(result_dir_path + savefig_pass +str(seed)+"/bayesian_" + str(i) +".pdf") 
     plt.close()
 
-def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int) -> float:
+def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int, train_index:NDArray[int]) -> float:
     #y_sample=np.random.choice(y_star, k, replace=False) # 重複なし  y*をK個サンプリング
     y_sample=np.tile(y_star,(pred_mu.shape[0],1))
     gamma_y=(y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
@@ -45,6 +45,7 @@ def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], 
     B=2*large_psi_gamma
     temp=np.divide(A, B, out=np.zeros_like(A), where=B!=0)-log_large_psi_gamma
     alpha=np.sum(temp,axis=0)/k
+    alpha[train_index]=0 #観測済みの点の獲得関数値は0にする
 
     return alpha
 '''
@@ -104,8 +105,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
             plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
             key=False
             
-
-        dim=10
+        dim=1000
         random_state = check_random_state(seed)
         omega = (np.sqrt(1/(length_scale**2)) * random_state.normal(
                 size=(dim, 1)))
@@ -124,7 +124,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         phi = RFM(X, dim,omega,b,variance)
 
         #パラメータΘの獲得. 引数は出したい関数の個数
-        k=20
+        k=10
         theta=Theta.getTheta(k)
         #ブラックボックス関数fの近似を取得する。
         f_x = np.dot(theta,phi.T)
@@ -137,13 +137,14 @@ def experiment(seed: int, initial_num: int, max_iter: int):
 
         #y*の獲得
         y_star = f_x.max(axis=1)
-        alpha = MES(y_star, pred_mu, pred_var_diag, k) 
+        alpha = MES(y_star, pred_mu, pred_var_diag, k,train_index) 
         next_index = np.argmax(alpha)
 
         x_next = X[next_index] #候補点
         y_next = y[next_index]
         X_train = np.append(X_train, [x_next], axis=0)
         y_train = np.append(y_train, [y_next], axis=0)
+        train_index.append(next_index)
 
         #獲得関数の値をプロットしてみる
         plt.title("point")
@@ -186,7 +187,7 @@ def main():
     #])
     
 if __name__ == "__main__":
-    seed = 1
+    seed = 3
     savefig_pass="RFM_seed"
     savefig_pass_alpha ="/alpha"
     result_dir_path = "./result/"
