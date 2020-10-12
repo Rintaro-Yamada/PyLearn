@@ -37,15 +37,14 @@ def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], 
     #y_sample=np.random.choice(y_star, k, replace=False) # 重複なし  y*をK個サンプリング
     y_sample=np.tile(y_star,(pred_mu.shape[0],1))
     gamma_y=(y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
-    #print(gamma_y)
-    psi_gamma=norm.pdf(gamma_y,loc=pred_mu,scale=np.sqrt(pred_var))
-    large_psi_gamma=norm.cdf(gamma_y, loc=pred_mu, scale=np.sqrt(pred_var))
-    log_large_psi_gamma=norm.logcdf(gamma_y, loc=pred_mu, scale=np.sqrt(pred_var))
+    psi_gamma=norm.pdf(gamma_y,loc=0,scale=1)
+    large_psi_gamma=norm.cdf(gamma_y, loc=0, scale=1)
+    log_large_psi_gamma=norm.logcdf(gamma_y, loc=0, scale=1)
     A=gamma_y*psi_gamma
     B=2*large_psi_gamma
     temp=np.divide(A, B, out=np.zeros_like(A), where=B!=0)-log_large_psi_gamma
     alpha=np.sum(temp,axis=0)/k
-    alpha[train_index]=0 #観測済みの点の獲得関数値は0にする
+    #alpha[train_index]=0 #観測済みの点の獲得関数値は0にする
 
     return alpha
 '''
@@ -86,7 +85,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     noise_var = 1.0e-4
     kernel=RBFKernel(variance,length_scale)
 
-    key=True
+    #key=True
 
     #max_iter回ベイズ最適化を行う
     for i in range (max_iter):
@@ -101,9 +100,8 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         pred_var_diag = np.diag(pred_var)
 
         #初期データの結果のプロット
-        if key:
-            plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
-            key=False
+        plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
+        #key=False
             
         dim=1000
         random_state = check_random_state(seed)
@@ -147,14 +145,11 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         train_index.append(next_index)
 
         #獲得関数の値をプロットしてみる
-        plt.title("point")
-        plt.plot(X.ravel(),alpha,"g")
-        plt.savefig(result_dir_path + savefig_pass +str(seed)+savefig_pass_alpha+"/alpha_" + str(i) +".pdf")
-        plt.close()
+        
 
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
-        ax1 = fig.add_subplot(2, 1, 1)
+        ax1 = fig.add_subplot(3, 1, 1)
         plt.title("Observed=%2d, x_next=%f"%(initial_num+i, x_next))
         #fのプロット
         for j in range(k):
@@ -164,13 +159,15 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         ax1.fill_between(X.ravel(), (RFM_pred_mu.ravel() + 2 * np.sqrt(RFM_pred_var_diag)).ravel(), (RFM_pred_mu.ravel() - 2 * np.sqrt(RFM_pred_var_diag)).ravel(), alpha=0.3, color="green", label="RFM_pred_var")
         ax1.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
         ax1.legend(loc="lower left",prop={'size': 8})
-        ax2 = fig.add_subplot(2, 1, 2)
+        ax2 = fig.add_subplot(3, 1, 2)
         ax2.plot(X.ravel(), y, "g--", label="true")
         ax2.plot(X.ravel(), RFM_pred_mu.ravel(), "r", label="RFM_pred_mean")
         ax2.fill_between(X.ravel(), (RFM_pred_mu.ravel() + 2 * np.sqrt(RFM_pred_var_diag)).ravel(), (RFM_pred_mu.ravel() - 2 * np.sqrt(RFM_pred_var_diag)).ravel(), alpha=0.3, color="green", label="RFM_pred_var")
         ax2.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
         ax2.plot(X_train.ravel()[-1], y_next, "b*", label="x_next_point")
         ax2.legend(loc="lower left",prop={'size': 8})
+        ax3 = fig.add_subplot(3, 1, 3)
+        ax3.plot(X.ravel(),alpha,"g")
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
     
@@ -187,7 +184,7 @@ def main():
     #])
     
 if __name__ == "__main__":
-    seed = 3
+    seed = 2
     savefig_pass="RFM_seed"
     savefig_pass_alpha ="/alpha"
     result_dir_path = "./result/"
