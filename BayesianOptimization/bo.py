@@ -3,6 +3,7 @@ import subprocess
 import sys
 import random
 import math
+import csv
 from nptyping import NDArray
 import matplotlib.pyplot as plt
 from sklearn.kernel_approximation import RBFSampler
@@ -34,7 +35,6 @@ def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[floa
     plt.close()
 
 def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int, train_index:NDArray[int]) -> float:
-    #y_sample=np.random.choice(y_star, k, replace=False) # 重複なし  y*をK個サンプリング
     y_sample=np.tile(y_star,(pred_mu.shape[0],1))
     gamma_y=(y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
     psi_gamma=norm.pdf(gamma_y,loc=0,scale=1)
@@ -47,6 +47,20 @@ def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], 
     #alpha[train_index]=0 #観測済みの点の獲得関数値は0にする
 
     return alpha
+
+def expected_improvement(X_train: NDArray[float], y_train: NDArray[float], pred_mean: NDArray[float], pred_var: NDArray[float]) -> NDArray[float]:
+    tau=y_train.max()
+    tau=np.full(X.shape,tau)
+    t=(pred_mean-tau)/pred_var
+    #norm.cdf、norm.pdfはscipy.statsのライブラリ。それぞれ標準正規分布の累積密度関数と、密度関数を示す
+    acq=(pred_mean-tau)*norm.cdf(x=t, loc=0, scale=1)+pred_var*norm.pdf(x=t, loc=0, scale=1)
+    return acq
+
+def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pred_var: NDArray[float]) -> NDArray[float]:
+    t = X_train.shape[0] - 1
+    acq = pred_mean + np.sqrt(np.log10(t ** 2) + 1) * np.sqrt(pred_var)
+    return acq
+
 '''
     #分布のプロットをしてみる
     plt.title("distribution")
@@ -70,6 +84,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     index_list = range(grid_num)
     X = np.c_[np.linspace(0, 1, grid_num)]
     y = func(X)
+    regret=np.empty(0)
     
     #初期点の生成
     random.seed(seed)
@@ -83,9 +98,10 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     variance=5
     #観測誤差の固定
     noise_var = 1.0e-4
-    kernel=RBFKernel(variance,length_scale)
+    kernel = RBFKernel(variance, length_scale)
 
-    #key=True
+    key = True
+    acq_name='EI'
 
     #max_iter回ベイズ最適化を行う
     for i in range (max_iter):
@@ -100,53 +116,65 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         pred_var_diag = np.diag(pred_var)
 
         #初期データの結果のプロット
-        plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
-        #key=False
-            
-        dim=1000
-        random_state = check_random_state(seed)
-        omega = (np.sqrt(1/(length_scale**2)) * random_state.normal(
+        if key:
+            plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
+            key = False
+        
+        if acq_name=='MES':
+            dim=1000
+            random_state = check_random_state(seed)
+            omega = (np.sqrt(1/(length_scale**2)) * random_state.normal(
                 size=(dim, 1)))
-        #omega = np.c_[np.sqrt(2*0.2)*np.random.randn(dim)]
+            #omega = np.c_[np.sqrt(2*0.2)*np.random.randn(dim)]
 
-        b = np.c_[np.random.rand(dim) * 2 * np.pi] #[0,2π]の一様乱数
+            b = np.c_[np.random.rand(dim) * 2 * np.pi] #[0,2π]の一様乱数
 
-        #RFMから特徴量ベクトルΦ(x)を取得
-        large_phi = RFM(X_train, dim,omega,b,variance) #D=100とした  10*1000
+            #RFMから特徴量ベクトルΦ(x)を取得
+            large_phi = RFM(X_train, dim,omega,b,variance) #D=100とした  10*1000
 
-        #パラメータΘの分布の計算
-        Theta = ThetaGenerator(dim,noise_var)
-        Theta.calc(large_phi,y_train)
+            #パラメータΘの分布の計算
+            Theta = ThetaGenerator(dim,noise_var)
+            Theta.calc(large_phi,y_train)
 
-        #Xの特徴量ベクトル
-        phi = RFM(X, dim,omega,b,variance)
+            #Xの特徴量ベクトル
+            phi = RFM(X, dim,omega,b,variance)
 
-        #パラメータΘの獲得. 引数は出したい関数の個数
-        k=10
-        theta=Theta.getTheta(k)
-        #ブラックボックス関数fの近似を取得する。
-        f_x = np.dot(theta,phi.T)
+            #パラメータΘの獲得. 引数は出したい関数の個数
+            k=10
+            theta=Theta.getTheta(k)
+            #ブラックボックス関数fの近似を取得する。
+            f_x = np.dot(theta,phi.T)
 
-        #fの予測分布
-        RFM_pred_mu=np.dot(phi,Theta.mu)
-        temp=np.dot(phi,Theta.var)
-        RFM_pred_var = np.dot(temp,phi.T)
-        RFM_pred_var_diag = np.diag(RFM_pred_var)
+            #fの予測分布
+            RFM_pred_mu=np.dot(phi,Theta.mu)
+            temp=np.dot(phi,Theta.var)
+            RFM_pred_var = np.dot(temp,phi.T)
+            RFM_pred_var_diag = np.diag(RFM_pred_var)
 
-        #y*の獲得
-        y_star = f_x.max(axis=1)
-        alpha = MES(y_star, pred_mu, pred_var_diag, k,train_index) 
+            #MES
+            y_star = f_x.max(axis=1)
+            alpha = MES(y_star, pred_mu, pred_var_diag, k, train_index)
+        
+        if acq_name == 'UCB':
+            alpha = upper_confidence_bound(X_train, pred_mu, pred_var_diag)
+
+        if acq_name == 'EI':
+            alpha = expected_improvement(X_train, y_train, pred_mu, pred_var_diag)
+
         next_index = np.argmax(alpha)
 
+        #データの更新
         x_next = X[next_index] #候補点
         y_next = y[next_index]
         X_train = np.append(X_train, [x_next], axis=0)
         y_train = np.append(y_train, [y_next], axis=0)
         train_index.append(next_index)
 
-        #獲得関数の値をプロットしてみる
-        
-
+        #simple_regret
+        train_regret_max = y_train.max(axis=0)
+        true_regret_max = y.max(axis=0)
+        regret=np.append(regret,true_regret_max-train_regret_max)
+        '''
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
         ax1 = fig.add_subplot(3, 1, 1)
@@ -170,7 +198,15 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         ax3.plot(X.ravel(),alpha,"g")
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
-    
+        '''
+    print(regret)
+    plt.plot(range(max_iter), regret, "g", label="simple_regret")
+    plt.legend()
+    plt.savefig(result_dir_path + savefig_pass + str(seed) + "/simple_regret.pdf")
+    plt.close()
+
+    np.savetxt('result/RFM_seed' + str(seed) + '/MES_regret.csv', regret)    
+
 def main():
     argv = sys.argv
     initial_num = int(argv[1])
@@ -185,7 +221,7 @@ def main():
     
 if __name__ == "__main__":
     seed = 2
-    savefig_pass="RFM_seed"
+    savefig_pass="seed"
     savefig_pass_alpha ="/alpha"
     result_dir_path = "./result/"
     _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)+savefig_pass_alpha])
@@ -201,8 +237,8 @@ if __name__ == "__main__":
 5. RFMの作成
 6. 関数fの近似
 7. y*の獲得
-5. 活性化関数の作成(MES)
-5. 新しい入力点x'の出力y'を求める
+8. 活性化関数の作成(MES)
+9. 新しい入力点x'の出力y'を求める
 
 '''
 '''
