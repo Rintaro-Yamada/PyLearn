@@ -35,14 +35,14 @@ def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[floa
     plt.close()
 '''
 def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int, train_index:NDArray[int]) -> float:
-    y_sample=np.tile(y_star,(pred_mu.shape[0],1))
-    gamma_y=(y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
-    psi_gamma=norm.pdf(gamma_y,loc=0,scale=1)
-    large_psi_gamma=norm.cdf(gamma_y, loc=0, scale=1)
-    log_large_psi_gamma=norm.logcdf(gamma_y, loc=0, scale=1)
-    A=gamma_y*psi_gamma
-    B=2*large_psi_gamma
-    temp=np.divide(A, B, out=np.zeros_like(A), where=B!=0)-log_large_psi_gamma
+    y_sample = np.tile(y_star,(pred_mu.shape[0],1))
+    gamma_y = (y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
+    psi_gamma = norm.pdf(gamma_y,loc=0,scale=1)
+    large_psi_gamma = norm.cdf(gamma_y, loc=0, scale=1)
+    log_large_psi_gamma = norm.logcdf(gamma_y, loc=0, scale=1)
+    A = gamma_y*psi_gamma
+    B = 2*large_psi_gamma
+    temp=A/B-log_large_psi_gamma
     alpha=np.sum(temp,axis=0)/k
     #alpha[train_index]=0 #観測済みの点の獲得関数値は0にする
 
@@ -175,7 +175,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         X_train = np.append(X_train, [x_next], axis=0)
         y_train = np.append(y_train, [y_next], axis=0)
         train_index.append(next_index)
-
+        
         #simple_regret
         train_regret_max = y_train.max(axis=0)
         true_regret_max = y.max(axis=0)
@@ -217,12 +217,17 @@ def main():
     argv = sys.argv
     initial_num = int(argv[1])
     max_iter = int(argv[2])
+
+    #単体テスト用
+    seed=1
+    experiment(seed, initial_num, max_iter)
     # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
+    '''
     parallel_num = 10
     _ = Parallel(n_jobs=parallel_num)([
         delayed(experiment)(j, initial_num, max_iter) for j in range(parallel_num)
     ])
-    
+    '''
 if __name__ == "__main__":
     main()
 

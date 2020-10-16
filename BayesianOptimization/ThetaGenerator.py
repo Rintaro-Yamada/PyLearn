@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import multivariate_normal
 from nptyping import NDArray
+from scipy.linalg import cholesky
 import sys
 
 class ThetaGenerator():
@@ -18,6 +19,9 @@ class ThetaGenerator():
         self.mu = np.dot(Ainv_phi_T, y)
         self.var = self.noise_var * Ainv        
 
-    def getTheta(self, num:int) -> NDArray[float]:
+    def getTheta(self, num: int) -> NDArray[float]:
+        L = cholesky(self.var, lower=True)
+        print(self.mu)
+        sys.exit()
         theta = multivariate_normal.rvs(mean=self.mu.ravel(), cov=self.var, size=num) #num個関数出してみる
         return theta
