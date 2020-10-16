@@ -21,7 +21,7 @@ def func(x: NDArray[float]) -> NDArray[float]: #テスト用のforrester関数
 def RFM(x:NDArray[float],dim:int,omega:NDArray[float],b:NDArray[float],variance:float) -> NDArray[float]:
     phi=np.sqrt(variance*2/dim)*(np.cos(omega.T*x+b.T))
     return phi
-
+'''
 def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[float],X_train:NDArray[float],y_train:NDArray[float],i:int):
     plt.rcParams["font.size"] = 13
     plt.subplot(1, 1, 1)
@@ -33,7 +33,7 @@ def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[floa
     plt.legend(loc="lower left",prop={'size': 8})
     plt.savefig(result_dir_path + savefig_pass +str(seed)+"/bayesian_" + str(i) +".pdf") 
     plt.close()
-
+'''
 def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int, train_index:NDArray[int]) -> float:
     y_sample=np.tile(y_star,(pred_mu.shape[0],1))
     gamma_y=(y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
@@ -50,7 +50,7 @@ def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], 
 
 def expected_improvement(X_train: NDArray[float], y_train: NDArray[float], pred_mean: NDArray[float], pred_var: NDArray[float]) -> NDArray[float]:
     tau=y_train.max()
-    tau=np.full(X.shape,tau)
+    tau=np.full(pred_mean.shape,tau)
     t=(pred_mean-tau)/pred_var
     #norm.cdf、norm.pdfはscipy.statsのライブラリ。それぞれ標準正規分布の累積密度関数と、密度関数を示す
     acq=(pred_mean-tau)*norm.cdf(x=t, loc=0, scale=1)+pred_var*norm.pdf(x=t, loc=0, scale=1)
@@ -79,6 +79,11 @@ def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pr
 '''
 
 def experiment(seed: int, initial_num: int, max_iter: int):
+
+    savefig_pass="seed"
+    result_dir_path = "./result/"
+    _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)])
+
     # 定義域は[0, 1] でgrid_num分割して候補点を生成
     grid_num = 200
     index_list = range(grid_num)
@@ -100,8 +105,8 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     noise_var = 1.0e-4
     kernel = RBFKernel(variance, length_scale)
 
-    key = True
-    acq_name='EI'
+    #key = True
+    acq_name='MES'
 
     #max_iter回ベイズ最適化を行う
     for i in range (max_iter):
@@ -116,10 +121,11 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         pred_var_diag = np.diag(pred_var)
 
         #初期データの結果のプロット
+        '''
         if key:
             plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
             key = False
-        
+        '''
         if acq_name=='MES':
             dim=1000
             random_state = check_random_state(seed)
@@ -174,7 +180,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         train_regret_max = y_train.max(axis=0)
         true_regret_max = y.max(axis=0)
         regret=np.append(regret,true_regret_max-train_regret_max)
-        '''
+        
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
         ax1 = fig.add_subplot(3, 1, 1)
@@ -198,33 +204,26 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         ax3.plot(X.ravel(),alpha,"g")
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
-        '''
+        
     print(regret)
     plt.plot(range(max_iter), regret, "g", label="simple_regret")
     plt.legend()
     plt.savefig(result_dir_path + savefig_pass + str(seed) + "/simple_regret.pdf")
     plt.close()
 
-    np.savetxt('result/RFM_seed' + str(seed) + '/MES_regret.csv', regret)    
+    np.savetxt('result/seed' + str(seed) + '/regret_'+acq_name+'.csv', regret)
 
 def main():
     argv = sys.argv
     initial_num = int(argv[1])
     max_iter = int(argv[2])
-    experiment(seed,initial_num,max_iter)
-    
     # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
-    #parallel_num = 1
-    #_ = Parallel(n_jobs=parallel_num)([
-    #    delayed(experiment)(k, initial_num, max_iter) for k in range(parallel_num)
-    #])
+    parallel_num = 10
+    _ = Parallel(n_jobs=parallel_num)([
+        delayed(experiment)(j, initial_num, max_iter) for j in range(parallel_num)
+    ])
     
 if __name__ == "__main__":
-    seed = 2
-    savefig_pass="seed"
-    savefig_pass_alpha ="/alpha"
-    result_dir_path = "./result/"
-    _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)+savefig_pass_alpha])
     main()
 
 
