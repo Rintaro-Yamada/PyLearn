@@ -36,10 +36,11 @@ def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[floa
 '''
 def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int, train_index:NDArray[int]) -> float:
     y_sample = np.tile(y_star,(pred_mu.shape[0],1))
-    gamma_y = (y_sample.T-pred_mu)/np.sqrt(pred_var) #gamma_y D*K配列
+    gamma_y = (y_sample.T-pred_mu)/np.sqrt(pred_var)
     psi_gamma = norm.pdf(gamma_y,loc=0,scale=1)
     large_psi_gamma = norm.cdf(gamma_y, loc=0, scale=1)
-    log_large_psi_gamma = norm.logcdf(gamma_y, loc=0, scale=1)
+    #log_large_psi_gamma = norm.logcdf(gamma_y, loc=0, scale=1)
+    log_large_psi_gamma = np.log(large_psi_gamma)
     A = gamma_y*psi_gamma
     B = 2*large_psi_gamma
     temp=A/B-log_large_psi_gamma
@@ -51,14 +52,17 @@ def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], 
 def expected_improvement(X_train: NDArray[float], y_train: NDArray[float], pred_mean: NDArray[float], pred_var: NDArray[float]) -> NDArray[float]:
     tau=y_train.max()
     tau=np.full(pred_mean.shape,tau)
-    t=(pred_mean-tau)/pred_var
+    t=(pred_mean-tau)/np.sqrt(pred_var)
     #norm.cdf、norm.pdfはscipy.statsのライブラリ。それぞれ標準正規分布の累積密度関数と、密度関数を示す
-    acq=(pred_mean-tau)*norm.cdf(x=t, loc=0, scale=1)+pred_var*norm.pdf(x=t, loc=0, scale=1)
+    acq=(pred_mean-tau)*norm.cdf(x=t, loc=0, scale=1)+np.sqrt(pred_var)*norm.pdf(x=t, loc=0, scale=1)
     return acq
 
 def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pred_var: NDArray[float]) -> NDArray[float]:
     t = X_train.shape[0] - 1
-    acq = pred_mean + np.sqrt(np.log10(t ** 2) + 1) * np.sqrt(pred_var)
+    #N = X_train.shape[0]
+    #print(t)
+    acq = pred_mean + np.sqrt(np.log10(t ** 2 + 1)) * np.sqrt(pred_var)
+    #acq = pred_mean + np.sqrt(np.log10(N)/N) * np.sqrt(pred_var)
     return acq
 
 '''
@@ -85,11 +89,11 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)])
 
     # 定義域は[0, 1] でgrid_num分割して候補点を生成
-    grid_num = 200
+    grid_num = 2000
     index_list = range(grid_num)
     X = np.c_[np.linspace(0, 1, grid_num)]
     y = func(X)
-    regret=np.empty(0)
+    #regret=np.empty(0)
     
     #初期点の生成
     random.seed(seed)
@@ -97,6 +101,11 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     train_index = random.sample(index_list, initial_num)
     X_train = X[train_index]
     y_train = y[train_index]
+
+    #初期点のsimple regret
+    train_regret_max = y_train.max(axis=0)
+    true_regret_max = y.max(axis=0)
+    regret = np.array(true_regret_max-train_regret_max)
 
     #カーネル行列の作成
     length_scale=0.1
@@ -106,7 +115,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     kernel = RBFKernel(variance, length_scale)
 
     #key = True
-    acq_name='MES'
+    acq_name='UCB'
 
     #max_iter回ベイズ最適化を行う
     for i in range (max_iter):
@@ -144,7 +153,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
 
             #Xの特徴量ベクトル
             phi = RFM(X, dim,omega,b,variance)
-
+            
             #パラメータΘの獲得. 引数は出したい関数の個数
             k=10
             theta=Theta.getTheta(k)
@@ -159,6 +168,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
 
             #MES
             y_star = f_x.max(axis=1)
+            #print(y_star)
             alpha = MES(y_star, pred_mu, pred_var_diag, k, train_index)
         
         if acq_name == 'UCB':
@@ -180,7 +190,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         train_regret_max = y_train.max(axis=0)
         true_regret_max = y.max(axis=0)
         regret=np.append(regret,true_regret_max-train_regret_max)
-        
+        '''
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
         ax1 = fig.add_subplot(3, 1, 1)
@@ -204,9 +214,9 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         ax3.plot(X.ravel(),alpha,"g")
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
-        
-    print(regret)
-    plt.plot(range(max_iter), regret, "g", label="simple_regret")
+        '''
+    #print(regret)
+    plt.plot(range(max_iter+1), regret, "g", label="simple_regret")
     plt.legend()
     plt.savefig(result_dir_path + savefig_pass + str(seed) + "/simple_regret.pdf")
     plt.close()
@@ -218,16 +228,19 @@ def main():
     initial_num = int(argv[1])
     max_iter = int(argv[2])
 
+
     #単体テスト用
-    seed=1
-    experiment(seed, initial_num, max_iter)
-    # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
     '''
+    seed=0
+    experiment(seed, initial_num, max_iter)
+    '''
+    # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
     parallel_num = 10
     _ = Parallel(n_jobs=parallel_num)([
-        delayed(experiment)(j, initial_num, max_iter) for j in range(parallel_num)
+        delayed(experiment)(l, initial_num, max_iter) for l in [i+1 for i in range(10, 20)]
     ])
-    '''
+    
+
 if __name__ == "__main__":
     main()
 

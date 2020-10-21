@@ -17,11 +17,15 @@ class ThetaGenerator():
         Ainv=np.linalg.inv(A)
         Ainv_phi_T = np.dot(Ainv, phi.T)
         self.mu = np.dot(Ainv_phi_T, y)
-        self.var = self.noise_var * Ainv        
+        self.var = self.noise_var * Ainv 
 
     def getTheta(self, num: int) -> NDArray[float]:
-        L = cholesky(self.var, lower=True)
-        print(self.mu)
-        sys.exit()
-        theta = multivariate_normal.rvs(mean=self.mu.ravel(), cov=self.var, size=num) #num個関数出してみる
+        L = np.linalg.cholesky(self.var)
+        z = np.random.randn(self.var.shape[1],num)
+        tmp = np.dot(L,z)
+        theta = self.mu.ravel() + tmp.T
+        #theta = multivariate_normal.rvs(mean=self.mu.ravel(), cov=self.var, size=num) #num個関数出してみる
+        #print(theta)
+
+        #sys.exit()
         return theta

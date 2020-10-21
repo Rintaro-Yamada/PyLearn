@@ -4,10 +4,10 @@ import sys
 def main():
     save_fig_name='./result/'+'regrets.pdf'
     plt.title('regrets')
-    acq = ['UCB','EI']
+    acq = ['MES','UCB','EI']
     for acq_name in acq:
-        regret=np.empty([0,10])
-        for seed in range(5):
+        regret=np.empty([0,11])
+        for seed in [i+1 for i in range(10, 20)]:
             file_pass = './result/seed'+str(seed)+'/'+'regret_'+acq_name+'.csv'
             regret = np.append(regret, [np.loadtxt(file_pass)], axis=0)
         
