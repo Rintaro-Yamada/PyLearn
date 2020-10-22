@@ -21,8 +21,8 @@ def func(x: NDArray[float]) -> NDArray[float]: #テスト用のforrester関数
 def RFM(x:NDArray[float],dim:int,omega:NDArray[float],b:NDArray[float],variance:float) -> NDArray[float]:
     phi=np.sqrt(variance*2/dim)*(np.cos(omega.T*x+b.T))
     return phi
-'''
-def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[float],X_train:NDArray[float],y_train:NDArray[float],i:int):
+
+def plot(seed, mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[float],X_train:NDArray[float],y_train:NDArray[float],i:int):
     plt.rcParams["font.size"] = 13
     plt.subplot(1, 1, 1)
     plt.title("Gaussian Process")
@@ -33,7 +33,7 @@ def plot(mu: NDArray[float], var: NDArray[float],X:NDArray[float],y:NDArray[floa
     plt.legend(loc="lower left",prop={'size': 8})
     plt.savefig(result_dir_path + savefig_pass +str(seed)+"/bayesian_" + str(i) +".pdf") 
     plt.close()
-'''
+
 def MES(y_star:NDArray[float], pred_mu:NDArray[float], pred_var:NDArray[float], k:int, train_index:NDArray[int]) -> float:
     y_sample = np.tile(y_star,(pred_mu.shape[0],1))
     gamma_y = (y_sample.T-pred_mu)/np.sqrt(pred_var)
@@ -58,10 +58,10 @@ def expected_improvement(X_train: NDArray[float], y_train: NDArray[float], pred_
     return acq
 
 def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pred_var: NDArray[float]) -> NDArray[float]:
-    t = X_train.shape[0] - 1
+    t = X_train.shape[0]
     #N = X_train.shape[0]
     #print(t)
-    acq = pred_mean + np.sqrt(np.log10(t ** 2 + 1)) * np.sqrt(pred_var)
+    acq = pred_mean + np.sqrt(2*np.log(t ** 2 + 1)) * np.sqrt(pred_var)
     #acq = pred_mean + np.sqrt(np.log10(N)/N) * np.sqrt(pred_var)
     return acq
 
@@ -83,13 +83,9 @@ def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pr
 '''
 
 def experiment(seed: int, initial_num: int, max_iter: int):
-
-    savefig_pass="seed"
-    result_dir_path = "./result/"
     _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)])
-
     # 定義域は[0, 1] でgrid_num分割して候補点を生成
-    grid_num = 2000
+    grid_num = 200
     index_list = range(grid_num)
     X = np.c_[np.linspace(0, 1, grid_num)]
     y = func(X)
@@ -97,7 +93,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     
     #初期点の生成
     random.seed(seed)
-    #np.random.seed(seed)
+    np.random.seed(seed)
     train_index = random.sample(index_list, initial_num)
     X_train = X[train_index]
     y_train = y[train_index]
@@ -115,7 +111,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
     kernel = RBFKernel(variance, length_scale)
 
     #key = True
-    acq_name='UCB'
+    acq_name='MES'
 
     #max_iter回ベイズ最適化を行う
     for i in range (max_iter):
@@ -130,11 +126,10 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         pred_var_diag = np.diag(pred_var)
 
         #初期データの結果のプロット
-        '''
-        if key:
-            plot(pred_mu, pred_var_diag, X, y, X_train, y_train,i)
-            key = False
-        '''
+        
+        
+        plot(seed,pred_mu, pred_var_diag, X, y, X_train, y_train,i)
+
         if acq_name=='MES':
             dim=1000
             random_state = check_random_state(seed)
@@ -168,6 +163,8 @@ def experiment(seed: int, initial_num: int, max_iter: int):
 
             #MES
             y_star = f_x.max(axis=1)
+            y_star[y_star < y_train.max()+np.sqrt(noise_var)*5] = y_train.max()+np.sqrt(noise_var)*5
+
             #print(y_star)
             alpha = MES(y_star, pred_mu, pred_var_diag, k, train_index)
         
@@ -190,7 +187,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         train_regret_max = y_train.max(axis=0)
         true_regret_max = y.max(axis=0)
         regret=np.append(regret,true_regret_max-train_regret_max)
-        '''
+        
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
         ax1 = fig.add_subplot(3, 1, 1)
@@ -214,7 +211,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         ax3.plot(X.ravel(),alpha,"g")
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
-        '''
+        
     #print(regret)
     plt.plot(range(max_iter+1), regret, "g", label="simple_regret")
     plt.legend()
@@ -237,11 +234,13 @@ def main():
     # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
     parallel_num = 10
     _ = Parallel(n_jobs=parallel_num)([
-        delayed(experiment)(l, initial_num, max_iter) for l in [i+1 for i in range(10, 20)]
+        delayed(experiment)(l, initial_num, max_iter) for l in [i for i in range(0, 10)]
     ])
     
 
 if __name__ == "__main__":
+    savefig_pass="seed"
+    result_dir_path = "./result/"
     main()
 
 
