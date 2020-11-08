@@ -3,11 +3,13 @@ import matplotlib.pyplot as plt
 import sys
 def main():
     save_fig_name='./result/'+'regrets.pdf'
-    plt.title('regrets')
+    #plt.title('regrets')
+    plt.xlabel('iteration')
+    plt.ylabel('simple regret')
     acq = ['MES','UCB','EI']
     for acq_name in acq:
-        regret=np.empty([0,11])
-        for seed in [i+1 for i in range(10, 20)]:
+        regret=np.empty([0,31])
+        for seed in [i for i in range(0, 10)]:
             file_pass = './result/seed'+str(seed)+'/'+'regret_'+acq_name+'.csv'
             regret = np.append(regret, [np.loadtxt(file_pass)], axis=0)
         
@@ -20,16 +22,15 @@ def main():
         lower_bound = mean - 2 * std_error
         if acq_name=='MES':
             plt.plot(range(mean.shape[0]),mean.ravel(),"b",label=acq_name)
-            plt.fill_between(range(mean.shape[0]),upper_bound,lower_bound,alpha=0.1,color="blue")
+            plt.fill_between(range(mean.shape[0]),upper_bound,lower_bound,alpha=0.1,color="blue",label="MES margin of error")
 
         if acq_name=='UCB':
             plt.plot(range(mean.shape[0]),mean.ravel(),"r",label=acq_name)
-            plt.fill_between(range(mean.shape[0]),upper_bound,lower_bound,alpha=0.1,color="red")
+            plt.fill_between(range(mean.shape[0]),upper_bound,lower_bound,alpha=0.1,color="red",label="UCB margin of error")
 
         if acq_name=='EI':
             plt.plot(range(mean.shape[0]),mean.ravel(),"g",label=acq_name)
-            plt.fill_between(range(mean.shape[0]),upper_bound,lower_bound,alpha=0.1,color="green")
-        
+            plt.fill_between(range(mean.shape[0]),upper_bound,lower_bound,alpha=0.1,color="green",label="EI margin of error")
     plt.legend()
     plt.savefig(save_fig_name)
     plt.close()

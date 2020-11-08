@@ -15,8 +15,8 @@ from RBFKernel import RBFKernel
 
 def func(x: NDArray[float]) -> NDArray[float]: #テスト用のforrester関数
     # 最大化したいので符号を反転
-    #return np.sin(5*x)
-    return (-1) * (6 * x - 2) ** 2 * np.sin(12 * x - 4)
+    return 0.1*(10*x-2)**2+5*np.sin(15*x)
+    #return (-1) * (6 * x - 2) ** 2 * np.sin(12 * x - 4)
 
 def RFM(x:NDArray[float],dim:int,omega:NDArray[float],b:NDArray[float],variance:float) -> NDArray[float]:
     phi=np.sqrt(variance*2/dim)*(np.cos(omega.T*x+b.T))
@@ -85,9 +85,9 @@ def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pr
 def experiment(seed: int, initial_num: int, max_iter: int):
     _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)])
     # 定義域は[0, 1] でgrid_num分割して候補点を生成
-    grid_num = 200
+    grid_num = 500
     index_list = range(grid_num)
-    X = np.c_[np.linspace(0, 1, grid_num)]
+    X = np.c_[np.linspace(-1, 1, grid_num)]
     y = func(X)
     #regret=np.empty(0)
     
@@ -126,9 +126,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         pred_var_diag = np.diag(pred_var)
 
         #初期データの結果のプロット
-        
-        
-        plot(seed,pred_mu, pred_var_diag, X, y, X_train, y_train,i)
+        #plot(seed,pred_mu, pred_var_diag, X, y, X_train, y_train,i)
 
         if acq_name=='MES':
             dim=1000
@@ -187,12 +185,13 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         train_regret_max = y_train.max(axis=0)
         true_regret_max = y.max(axis=0)
         regret=np.append(regret,true_regret_max-train_regret_max)
-        
+        '''     
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
         ax1 = fig.add_subplot(3, 1, 1)
         plt.title("Observed=%2d, x_next=%f"%(initial_num+i, x_next))
         #fのプロット
+           
         for j in range(k):
             ax1.plot(X.ravel(), f_x[j].ravel(), "b", label="f_"+str(j))
         ax1.plot(X.ravel(), y, "g--", label="true")
@@ -211,8 +210,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         ax3.plot(X.ravel(),alpha,"g")
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
-        
-    #print(regret)
+        '''
     plt.plot(range(max_iter+1), regret, "g", label="simple_regret")
     plt.legend()
     plt.savefig(result_dir_path + savefig_pass + str(seed) + "/simple_regret.pdf")
@@ -237,7 +235,6 @@ def main():
         delayed(experiment)(l, initial_num, max_iter) for l in [i for i in range(0, 10)]
     ])
     
-
 if __name__ == "__main__":
     savefig_pass="seed"
     result_dir_path = "./result/"
