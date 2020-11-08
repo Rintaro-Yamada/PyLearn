@@ -161,7 +161,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
 
             #MES
             y_star = f_x.max(axis=1)
-            y_star[y_star < y_train.max()+np.sqrt(noise_var)*5] = y_train.max()+np.sqrt(noise_var)*5
+            #y_star[y_star < y_train.max()+np.sqrt(noise_var)*5] = y_train.max()+np.sqrt(noise_var)*5
 
             #print(y_star)
             alpha = MES(y_star, pred_mu, pred_var_diag, k, train_index)
@@ -185,6 +185,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         train_regret_max = y_train.max(axis=0)
         true_regret_max = y.max(axis=0)
         regret=np.append(regret,true_regret_max-train_regret_max)
+
         '''     
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
@@ -211,11 +212,39 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
         plt.close()
         '''
+
+        ''' conflict 部分
+        if acq_name == 'MES':
+            #候補点とRFMによって得られた関数fの描写
+            fig = plt.figure(figsize=(10,10))
+            ax1 = fig.add_subplot(3, 1, 1)
+            plt.title("Observed=%2d, x_next=%f"%(initial_num+i, x_next))
+            #fのプロット
+            for j in range(k):
+                ax1.plot(X.ravel(), f_x[j].ravel(), "b", label="f_"+str(j))
+            ax1.plot(X.ravel(), y, "g--", label="true")
+            ax1.plot(X.ravel(), RFM_pred_mu.ravel(), "r", label="RFM_pred_mean")
+            ax1.fill_between(X.ravel(), (RFM_pred_mu.ravel() + 2 * np.sqrt(RFM_pred_var_diag)).ravel(), (RFM_pred_mu.ravel() - 2 * np.sqrt(RFM_pred_var_diag)).ravel(), alpha=0.3, color="green", label="RFM_pred_var")
+            ax1.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
+            ax1.legend(loc="lower left",prop={'size': 8})
+            ax2 = fig.add_subplot(3, 1, 2)
+            ax2.plot(X.ravel(), y, "g--", label="true")
+            ax2.plot(X.ravel(), RFM_pred_mu.ravel(), "r", label="RFM_pred_mean")
+            ax2.fill_between(X.ravel(), (RFM_pred_mu.ravel() + 2 * np.sqrt(RFM_pred_var_diag)).ravel(), (RFM_pred_mu.ravel() - 2 * np.sqrt(RFM_pred_var_diag)).ravel(), alpha=0.3, color="green", label="RFM_pred_var")
+            ax2.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
+            ax2.plot(X_train.ravel()[-1], y_next, "b*", label="x_next_point")
+            ax2.legend(loc="lower left",prop={'size': 8})
+            ax3 = fig.add_subplot(3, 1, 3)
+            ax3.plot(X.ravel(),alpha,"g")
+            plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
+            plt.close()
+        '''
+    #print(regret)
     plt.plot(range(max_iter+1), regret, "g", label="simple_regret")
     plt.legend()
     plt.savefig(result_dir_path + savefig_pass + str(seed) + "/simple_regret.pdf")
     plt.close()
-
+    
     np.savetxt('result/seed' + str(seed) + '/regret_'+acq_name+'.csv', regret)
 
 def main():
@@ -225,8 +254,8 @@ def main():
 
 
     #単体テスト用
-    '''
-    seed=0
+    
+    seed=2
     experiment(seed, initial_num, max_iter)
     '''
     # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
@@ -234,7 +263,7 @@ def main():
     _ = Parallel(n_jobs=parallel_num)([
         delayed(experiment)(l, initial_num, max_iter) for l in [i for i in range(0, 10)]
     ])
-    
+    '''
 if __name__ == "__main__":
     savefig_pass="seed"
     result_dir_path = "./result/"
