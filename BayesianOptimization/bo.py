@@ -13,10 +13,11 @@ from joblib import Parallel, delayed
 from ThetaGenerator import ThetaGenerator
 from RBFKernel import RBFKernel
 
+
 def func(x: NDArray[float]) -> NDArray[float]: #テスト用のforrester関数
     # 最大化したいので符号を反転
-    return 0.1*(10*x-2)**2+5*np.sin(15*x)
-    #return (-1) * (6 * x - 2) ** 2 * np.sin(12 * x - 4)
+    #return 0.1*(10*x-2)**2+5*np.sin(15*x)
+    return (-1) * (6 * x - 2) ** 2 * np.sin(12 * x - 4)
 
 def RFM(x:NDArray[float],dim:int,omega:NDArray[float],b:NDArray[float],variance:float) -> NDArray[float]:
     phi=np.sqrt(variance*2/dim)*(np.cos(omega.T*x+b.T))
@@ -85,9 +86,9 @@ def upper_confidence_bound(X_train: NDArray[float],pred_mean: NDArray[float], pr
 def experiment(seed: int, initial_num: int, max_iter: int):
     _ = subprocess.check_call(["mkdir", "-p", result_dir_path + savefig_pass + str(seed)])
     # 定義域は[0, 1] でgrid_num分割して候補点を生成
-    grid_num = 500
+    grid_num = 200
     index_list = range(grid_num)
-    X = np.c_[np.linspace(-1, 1, grid_num)]
+    X = np.c_[np.linspace(0, 1, grid_num)]
     y = func(X)
     #regret=np.empty(0)
     
@@ -126,7 +127,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         pred_var_diag = np.diag(pred_var)
 
         #初期データの結果のプロット
-        #plot(seed,pred_mu, pred_var_diag, X, y, X_train, y_train,i)
+        plot(seed,pred_mu, pred_var_diag, X, y, X_train, y_train,i)
 
         if acq_name=='MES':
             dim=1000
@@ -186,7 +187,7 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         true_regret_max = y.max(axis=0)
         regret=np.append(regret,true_regret_max-train_regret_max)
 
-        '''     
+        '''
         #候補点とRFMによって得られた関数fの描写
         fig = plt.figure(figsize=(10,10))
         ax1 = fig.add_subplot(3, 1, 1)
@@ -213,32 +214,40 @@ def experiment(seed: int, initial_num: int, max_iter: int):
         plt.close()
         '''
 
-        ''' conflict 部分
         if acq_name == 'MES':
             #候補点とRFMによって得られた関数fの描写
-            fig = plt.figure(figsize=(10,10))
-            ax1 = fig.add_subplot(3, 1, 1)
-            plt.title("Observed=%2d, x_next=%f"%(initial_num+i, x_next))
+            fig = plt.figure(figsize=(13,4.5))
+            plt.rcParams["font.size"] = 13
+            #ax1 = fig.add_subplot(111, ylabel='y')
+            
+            #ax2 = fig.add_subplot(312,ylabel='y2')
+            #ax3 = fig.add_subplot(313,ylabel='y3')
+            #plt.title("Observed=%2d, x_next=%f"%(initial_num+i, x_next))
             #fのプロット
             for j in range(k):
-                ax1.plot(X.ravel(), f_x[j].ravel(), "b", label="f_"+str(j))
-            ax1.plot(X.ravel(), y, "g--", label="true")
-            ax1.plot(X.ravel(), RFM_pred_mu.ravel(), "r", label="RFM_pred_mean")
-            ax1.fill_between(X.ravel(), (RFM_pred_mu.ravel() + 2 * np.sqrt(RFM_pred_var_diag)).ravel(), (RFM_pred_mu.ravel() - 2 * np.sqrt(RFM_pred_var_diag)).ravel(), alpha=0.3, color="green", label="RFM_pred_var")
-            ax1.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
-            ax1.legend(loc="lower left",prop={'size': 8})
-            ax2 = fig.add_subplot(3, 1, 2)
+                if (j == k - 1):
+                    plt.plot(X.ravel(), f_x[j].ravel(), "b", label="sumpled function") 
+                else:
+                    plt.plot(X.ravel(), f_x[j].ravel(), "b")
+            #plt.plot(X.ravel(), y, "g--", label="true")
+            plt.plot(X.ravel(), pred_mu.ravel(), "r", label="pred mean")
+            plt.fill_between(X.ravel(), (pred_mu.ravel() + 2 * np.sqrt(pred_var_diag)).ravel(), (pred_mu.ravel() - 2 * np.sqrt(pred_var_diag)).ravel(), alpha=0.3, color="green", label="credible interval")
+            #plt.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
+            plt.legend(loc="lower left", prop={'size': 8})
+            plt.xlabel("x")
+            plt.ylabel("y")
+            '''
             ax2.plot(X.ravel(), y, "g--", label="true")
             ax2.plot(X.ravel(), RFM_pred_mu.ravel(), "r", label="RFM_pred_mean")
             ax2.fill_between(X.ravel(), (RFM_pred_mu.ravel() + 2 * np.sqrt(RFM_pred_var_diag)).ravel(), (RFM_pred_mu.ravel() - 2 * np.sqrt(RFM_pred_var_diag)).ravel(), alpha=0.3, color="green", label="RFM_pred_var")
             ax2.plot(X_train.ravel()[:len(X_train)-1], y_train[:len(X_train)-1], "ro", label="observed")
             ax2.plot(X_train.ravel()[-1], y_next, "b*", label="x_next_point")
             ax2.legend(loc="lower left",prop={'size': 8})
-            ax3 = fig.add_subplot(3, 1, 3)
             ax3.plot(X.ravel(),alpha,"g")
+            '''
             plt.savefig(result_dir_path + savefig_pass +str(seed)+"/rfm_" + str(i) +".pdf")
             plt.close()
-        '''
+        
     #print(regret)
     plt.plot(range(max_iter+1), regret, "g", label="simple_regret")
     plt.legend()
@@ -255,7 +264,7 @@ def main():
 
     #単体テスト用
     
-    seed=2
+    seed=0
     experiment(seed, initial_num, max_iter)
     '''
     # 初期点を変えた10通りの実験を並列に行う (詳しくは公式のリファレンスを見てください)
